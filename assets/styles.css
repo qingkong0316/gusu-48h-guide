@@ -2412,8 +2412,6 @@ body.modal-open { overflow: hidden; }
    ========================================================= */
 .map-layout--single { grid-template-columns: minmax(0, 1.6fr) minmax(330px, 0.72fr); }
 .map--single { height: 620px; }
-/* 全局 svg 图标规则会把 Leaflet 覆盖层 SVG 压成 1em，路线 polyline 会被裁掉 */
-.leaflet-overlay-pane svg { width: auto; height: auto; }
 .map-panel-tabs {
   display: flex;
   gap: 4px;
