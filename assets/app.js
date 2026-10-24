@@ -2049,53 +2049,89 @@
     renderMapMarkers(items, planMode, true);
   }
 
-  function routeLegsForMap() {
+  function routeDaysForMap() {
     if (!state.plan) return [];
-    if (!(state.mapFilter === "day1" || state.mapFilter === "day2")) return [];
-    return state.transit?.[state.day] || [];
+    if (state.mapFilter === "all") return [1, 2];
+    if (state.mapFilter === "day1" || state.mapFilter === "day2") return [state.day];
+    // 食单/体验视图也保留当天路线作背景，避免点位看起来是一盘散沙。
+    return [state.day];
   }
 
   function drawRouteLayer(planMode) {
     const bounds = [];
-    if (!planMode || !window.L) return bounds;
+    if (!window.L) return bounds;
     const seenNodes = new Set();
-    routeLegsForMap().forEach((leg) => {
-      if (!leg.from || !leg.to || !Number.isFinite(leg.from.lat) || !Number.isFinite(leg.from.lng) ||
-          !Number.isFinite(leg.to.lat) || !Number.isFinite(leg.to.lng)) return;
-      const from = latLng(leg.from);
-      const to = latLng(leg.to);
-      const color = leg.mode === "taxi" ? "#a6402f" : "#3f675b";
-      window.L.polyline([from, to], { color: "#fffdf8", weight: 9, opacity: 0.9 }).addTo(routeLayer);
-      const line = window.L.polyline([from, to], {
-        color,
-        weight: 4,
-        opacity: 0.96,
-        dashArray: leg.mode === "walk" ? "7 7" : null,
+    const days = routeDaysForMap();
+    days.forEach((dayNum) => {
+      const legs = state.transit?.[dayNum] || [];
+      const ordered = [];
+      legs.forEach((leg) => {
+        if (!leg.from || !leg.to || !Number.isFinite(leg.from.lat) || !Number.isFinite(leg.from.lng) ||
+            !Number.isFinite(leg.to.lat) || !Number.isFinite(leg.to.lng)) return;
+        const from = latLng(leg.from);
+        const to = latLng(leg.to);
+        if (!ordered.length) ordered.push(from);
+        ordered.push(to);
+      });
+      if (!ordered.length) return;
+      bounds.push(...ordered);
+      const dayColor = dayNum === 2 ? "#3f675b" : "#a6402f";
+      const faded = !planMode && state.mapFilter !== "all";
+
+      if (planMode) {
+        // 金色柔光垫底，让路线在浅色底图上真正“跳出来”。
+        window.L.polyline(ordered, { color: "#b08a4f", weight: 15, opacity: 0.24 }).addTo(routeLayer);
+      }
+      window.L.polyline(ordered, { color: "#fffdf8", weight: planMode ? 12 : 10, opacity: 0.94 }).addTo(routeLayer);
+      const baseLine = window.L.polyline(ordered, {
+        color: dayColor,
+        weight: planMode ? 7 : 6,
+        opacity: faded ? 0.38 : 0.96,
+        dashArray: null,
       }).addTo(routeLayer);
-      const modeLabel = leg.mode === "taxi" ? "打车" : "步行";
-      line.bindTooltip(`${modeLabel} ${leg.minutes} 分钟`, { sticky: true });
-      const nav = amapNavUrl(leg.from, leg.to, leg.mode);
-      line.bindPopup(`<div class="gusu-popup">
-        <div class="pp-kicker">${modeLabel} · ${leg.minutes} 分钟</div>
-        <h4>${esc(leg.from.short || leg.from.name)} → ${esc(leg.to.short || leg.to.name)}</h4>
-        <p>${leg.fare ? `参考车费约 ¥${leg.fare}` : "步行可达"} · 实际以导航为准</p>
-        ${nav ? `<div class="pp-actions"><a href="${esc(nav)}" target="_blank" rel="noopener">高德导航</a></div>` : ""}
-      </div>`);
-      bounds.push(from, to);
-      [leg.from, leg.to].forEach((node) => {
-        if (!node || !Number.isFinite(node.lat) || seenNodes.has(node.id)) return;
-        if (node.kind !== "station" && node.kind !== "stay") return;
-        seenNodes.add(node.id);
-        const label = node.kind === "station" ? (node.short || "车站") : "住宿";
-        const icon = window.L.divIcon({
-          className: `gusu-route-node ${node.kind === "station" ? "is-station" : "is-stay"}`,
-          html: `<span>${esc(label)}</span>`,
-          iconSize: [86, 22],
-          iconAnchor: [43, 11],
+      baseLine.bindTooltip(`Day ${dayNum} · 当天路线`, { sticky: true });
+
+      if (planMode) {
+        // 在连续路线之上再叠交通方式：绿色虚线步行、红色实线打车。
+        legs.forEach((leg) => {
+          if (!leg.from || !leg.to || !Number.isFinite(leg.from.lat) || !Number.isFinite(leg.to.lat)) return;
+          const from = latLng(leg.from);
+          const to = latLng(leg.to);
+          const modeColor = leg.mode === "taxi" ? "#a6402f" : "#2f6b58";
+          const modeLine = window.L.polyline([from, to], {
+            color: modeColor,
+            weight: 6,
+            opacity: 1,
+            dashArray: leg.mode === "walk" ? "9 8" : null,
+          }).addTo(routeLayer);
+          const modeLabel = leg.mode === "taxi" ? "打车" : "步行";
+          modeLine.bindTooltip(`${modeLabel} ${leg.minutes} 分钟`, { sticky: true });
+          const nav = amapNavUrl(leg.from, leg.to, leg.mode);
+          modeLine.bindPopup(`<div class="gusu-popup">
+            <div class="pp-kicker">${modeLabel} · ${leg.minutes} 分钟</div>
+            <h4>${esc(leg.from.short || leg.from.name)} → ${esc(leg.to.short || leg.to.name)}</h4>
+            <p>${leg.fare ? `参考车费约 ¥${leg.fare}` : "步行可达"} · 实际以导航为准</p>
+            ${nav ? `<div class="pp-actions"><a href="${esc(nav)}" target="_blank" rel="noopener">高德导航</a></div>` : ""}
+          </div>`);
         });
-        window.L.marker(latLng(node), { icon, title: node.short || label, alt: node.short || label })
-          .addTo(routeLayer)
-          .bindTooltip(esc(node.short || label), { direction: "top", offset: [0, -8] });
+      }
+
+      legs.forEach((leg) => {
+        [leg.from, leg.to].forEach((node) => {
+          if (!node || !Number.isFinite(node.lat) || seenNodes.has(node.id)) return;
+          if (node.kind !== "station" && node.kind !== "stay") return;
+          seenNodes.add(node.id);
+          const label = node.kind === "station" ? (node.short || "车站") : "住宿";
+          const icon = window.L.divIcon({
+            className: `gusu-route-node ${node.kind === "station" ? "is-station" : "is-stay"}`,
+            html: `<span>${esc(label)}</span>`,
+            iconSize: [86, 22],
+            iconAnchor: [43, 11],
+          });
+          window.L.marker(latLng(node), { icon, title: node.short || label, alt: node.short || label })
+            .addTo(routeLayer)
+            .bindTooltip(esc(node.short || label), { direction: "top", offset: [0, -8] });
+        });
       });
     });
     return bounds;
