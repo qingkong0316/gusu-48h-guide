@@ -34,7 +34,7 @@
         <p id="railWeekday">周二出发 · 周三夜归 · 2 人</p>
         <div class="rail-stats">
           <span id="railBudgetLabel">人均预算</span>
-          <b id="railBudget">¥990</b>
+          <b id="railBudget">¥540</b>
         </div>
         <div class="rail-exp" id="railExp"></div>
       </div>
@@ -257,6 +257,7 @@
             <button type="button" class="price-clear" id="foodPriceClear">不限</button>
           </div>
         </div>
+        <p class="tiny" style="margin:2px 0 0">改价位会同步重排行程、地图与预算；这里和「定制生成」用的是同一套价位。</p>
         <div class="food-count-row">
           <span id="foodCount">共 57 家</span>
           <button type="button" class="text-btn" id="foodLoadMore">刷新 · 再来 9 家</button>
@@ -348,9 +349,10 @@
             <p class="tiny" id="checkProgressText">0 / 6 已完成</p>
           </article>
           <article class="prep-card reveal">
-            <header><span>02</span><h3>两个人的预算</h3><p>不含住宿 · 随方案变化</p></header>
+            <header><span>02</span><h3>两个人的预算</h3><p>以两人合计为主 · 随方案变化</p></header>
             <div class="budget-rows" id="budgetRows"></div>
-            <div class="budget-total"><span>两人合计</span><b id="budgetTotal">—</b></div>
+            <div class="budget-total"><span>两人合计<small>不含住宿</small></span><b id="budgetTotal">—</b></div>
+            <div class="budget-stay" id="budgetStay"></div>
             <p class="tiny" id="budgetNote">按当前生成方案估算；含门票、餐饮、体验与市内交通。</p>
           </article>
           <article class="prep-card reveal">
@@ -453,7 +455,7 @@
               </div>
             </fieldset>
             <fieldset class="control-group wide">
-              <legend>人均价位 <small>预设或手动输入</small></legend>
+              <legend>人均价位 <small>预设或手动输入 · 改完立即重排</small></legend>
               <div class="price-control price-control--dark">
                 <div class="chip-row" id="pricePresets"></div>
                 <div class="price-inputs">
@@ -500,7 +502,7 @@
           <div class="generator-result" id="generatorResult">
             <div class="result-stat"><span>路线</span><b id="resultRoute">古城东 → 古城西 → 湖东</b></div>
             <div class="result-stat"><span>步行</span><b id="resultWalk">约 1.6 万步 / 天</b></div>
-            <div class="result-stat"><span>人均</span><b id="resultBudget">¥930 起</b></div>
+            <div class="result-stat"><span>两人合计</span><b id="resultBudget">¥1,080 起</b></div>
             <div class="result-stat"><span>预约</span><b id="resultBooking">苏博 + 园林</b></div>
           </div>
           <p class="sr-only" id="generateStatus" role="status" aria-live="polite"></p>

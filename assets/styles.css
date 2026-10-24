@@ -1102,6 +1102,18 @@ svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1
 .budget-total { display: flex; align-items: baseline; justify-content: space-between; margin-top: 15px; padding-top: 13px; border-top: 1px solid var(--line-strong); }
 .budget-total span { font-size: 11px; color: var(--ink-3); }
 .budget-total b { font-family: var(--serif); font-size: 28px; font-weight: 500; color: var(--red); }
+.budget-row .budget-nums { display: inline-flex; align-items: baseline; gap: 8px; flex: none; }
+.budget-row .budget-nums b { font-family: var(--serif); font-size: 13px; font-weight: 600; color: var(--ink); }
+.budget-row .budget-nums i { font-style: normal; font-size: 10px; color: var(--muted); }
+.budget-row--round span { color: var(--muted); }
+.budget-total b { display: inline-flex; align-items: baseline; gap: 10px; }
+.budget-total b i { font-style: normal; font-family: var(--sans); font-size: 12px; font-weight: 400; color: var(--muted); }
+.budget-total span small { font-size: 9px; color: var(--muted); margin-left: 5px; }
+.budget-stay { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 9px; padding-bottom: 9px; border-bottom: 1px dashed var(--line); font-size: 11px; color: var(--ink-3); }
+.budget-stay small { font-size: 9px; color: var(--muted); }
+.budget-stay .budget-nums { display: inline-flex; align-items: baseline; gap: 8px; flex: none; }
+.budget-stay .budget-nums b { font-family: var(--serif); font-size: 13px; font-weight: 600; color: var(--ink); }
+.budget-stay .budget-nums i { font-style: normal; font-size: 10px; color: var(--muted); }
 .icon-list { margin-top: 8px; }
 .icon-list li { display: grid; grid-template-columns: 132px 1fr; gap: 10px; padding: 9px 0; border-bottom: 1px dashed var(--line); font-size: 11px; line-height: 1.7; }
 .icon-list b { font-family: var(--serif); font-weight: 600; color: var(--ink); }
@@ -2145,6 +2157,8 @@ body.modal-open { overflow: hidden; }
   .map-subhead { display: block; }
   .map-subhead > p { margin-top: 8px; text-align: left; }
   .map-section--merged { padding-bottom: 54px; }
+  /* 预算卡在窄屏把两人金额与人均竖排，避免两个数字挤在一行。 */
+  .budget-row .budget-nums, .budget-stay .budget-nums { flex-direction: column; align-items: flex-end; gap: 1px; }
 }
 @media (min-width: 901px) {
   .site-header { display: none; }

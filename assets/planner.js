@@ -419,6 +419,8 @@
       stationNode: STATION_NODES[prefs.station] || STATION_NODE,
       priceFallback: false,
       foodNotes: [],
+      // 已经排进行程的餐厅：同一个方案里不重复用同一家。
+      usedFoods: new Set(),
       placeById: (id) => byId.get(id) || null,
       hasPlace: (id) => byId.has(id),
     };
@@ -979,6 +981,11 @@
       } else if (f.hasHanfu) {
         title = "初见姑苏 · 穿汉服走进园林";
         summary = "苏博看光影，拙政园拍框景，傍晚换一身汉服去坐船。";
+      } else if (!f.hasPingtan) {
+        // 默认方案没有评弹，摘要不要提不存在的安排。
+        summary = f.hasBoat
+          ? "从苏博的片石假山走到拙政园的框景，傍晚在平江路摇橹船，坐进灯影里。"
+          : "从苏博的片石假山走到拙政园的框景，傍晚在平江路看灯、吃小食。";
       }
       const warnings = [];
       if (f.hasHanfu && f.hasNight) warnings.push("汉服妆造 + 夜游网师园会让今天很满；建议二选一，或把汉服改到次日早上。");
@@ -1427,13 +1434,18 @@
       rows.stay = base && base.stay && base.stay.price ? Number(base.stay.price) * nights : 0;
       const perPerson = round10(rows.ticket + rows.food + rows.exp + rows.custom + rows.transit + rows.buffer);
       const total = perPerson * 2;
+      // 住宿填的是两人房费，人均要单独摊一份，合计才能和卡片里的两列对齐。
+      const stayPerPerson = Math.round(rows.stay / 2);
       return {
         rows,
         perPerson,
         total,
         nights,
+        // 有基地但没填价格 → 住宿没进预算；连基地都没有 → 另一句提示。
+        staySet: !!(base && base.stay),
         stayMissing: !!(base && base.stay && !base.stay.price),
-        perPersonWithStay: Math.round((total + rows.stay) / 2),
+        stayPerPerson,
+        perPersonWithStay: perPerson + stayPerPerson,
         totalWithStay: total + rows.stay,
       };
     }
@@ -1465,18 +1477,19 @@
     }
 
     function chooseFoodByPrice(defaultId, slot) {
-      if (state.priceMin == null && state.priceMax == null) return defaultId;
-      const def = ctx.placeById(defaultId);
-      if (def && inPrice(def)) return defaultId;
-      const filter = PRICE_SLOT_POOLS[slot];
-      if (!filter) return defaultId;
-      const candidates = ctx.data.foods.filter((f) => filter(f) && inPrice(f));
-      if (!candidates.length) {
-        ctx.priceFallback = true;
-        const note = "价位区间内没有合适的餐厅，已回退默认食单；可放宽价格或直接指定。";
-        if (!ctx.foodNotes.includes(note)) ctx.foodNotes.push(note);
+      if (state.priceMin == null && state.priceMax == null) {
+        ctx.usedFoods.add(defaultId);
         return defaultId;
       }
+      const def = ctx.placeById(defaultId);
+      if (def && inPrice(def)) {
+        ctx.usedFoods.add(defaultId);
+        return defaultId;
+      }
+      const filter = PRICE_SLOT_POOLS[slot];
+      if (!filter) return defaultId;
+      const pool = ctx.data.foods.filter(filter);
+      if (!pool.length) return defaultId;
       const styleTags = state.food === "local"
         ? ["小吃", "生煎", "面馆", "市集", "早餐"]
         : state.food === "splurge"
@@ -1487,7 +1500,13 @@
         : state.priceMin != null
           ? state.priceMin + 50
           : Math.max(0, state.priceMax - 50);
-      return candidates
+      const inRange = pool.filter(inPrice);
+      // 区间内没有合适的餐厅时，取离目标价位最近的一家，而不是回退到可能贵一倍的默认店。
+      const candidates = inRange.length ? inRange : pool;
+      // 同一家不重复排：先把用过的排除，候选全用完才允许重复。
+      const fresh = candidates.filter((f) => !ctx.usedFoods.has(f.id));
+      const usable = fresh.length ? fresh : candidates;
+      const picked = usable
         .map((f) => {
           let score = 0;
           if (styleTags.some((t) => (f.tags || []).includes(t))) score += 4;
@@ -1495,10 +1514,57 @@
           score -= Math.abs(f.price - mid) / 100;
           return { f, score };
         })
-        .sort((a, b) => b.score - a.score)[0].f.id;
+        .sort((a, b) => b.score - a.score)[0].f;
+      ctx.usedFoods.add(picked.id);
+      if (!inRange.length) {
+        ctx.priceFallback = true;
+        const note = `价位区间里没有合适的餐厅，已换成最接近的一家（人均 ¥${picked.price}）。`;
+        if (!ctx.foodNotes.includes(note)) ctx.foodNotes.push(note);
+      }
+      return picked.id;
     }
 
     return { buildDay1, buildDay2, chooseFoodByPrice, computeBudget, computeDayBudget, buildPlan, buildTransitLegs };
+  }
+
+  /* 预算卡的双列口径：每行同时给出人均与两人金额，两列各自竖着相加等于合计。
+     住宿不进这张表，它按每晚房价单列在合计下面，合计口径是「行程本身花多少」。 */
+  function budgetColumns(budget) {
+    const b = budget || {};
+    const r = b.rows || {};
+    const num = (v) => Number(v) || 0;
+    const items = [
+      { key: "ticket", perPerson: num(r.ticket) },
+      { key: "food", perPerson: num(r.food) },
+      { key: "exp", perPerson: num(r.exp) },
+      { key: "custom", perPerson: num(r.custom) },
+      { key: "transit", perPerson: num(r.transit) },
+      { key: "buffer", perPerson: num(r.buffer) },
+    ];
+    const rows = items.map((x) => ({ key: x.key, perPerson: x.perPerson, total: x.perPerson * 2 }));
+    const rawPerPerson = rows.reduce((s, x) => s + x.perPerson, 0);
+    const rawTotal = rows.reduce((s, x) => s + x.total, 0);
+    const perPersonTotal = b.perPerson != null ? Number(b.perPerson) : rawPerPerson;
+    const totalTotal = b.total != null ? Number(b.total) : rawTotal;
+    const stayTotal = num(r.stay);
+    const stayPerPerson = b.stayPerPerson != null ? Number(b.stayPerPerson) : Math.round(stayTotal / 2);
+    return {
+      rows,
+      perPersonTotal,
+      totalTotal,
+      // 分项之和与合计之间的取整差额；正常为 0，不为 0 时要在卡片里补一行「取整」。
+      roundPerPerson: perPersonTotal - rawPerPerson,
+      roundTotal: totalTotal - rawTotal,
+      stay: {
+        total: stayTotal,
+        perPerson: stayPerPerson,
+        nights: b.nights || 0,
+        set: !!b.staySet,
+        missing: !!b.stayMissing,
+      },
+      perPersonWithStay: b.perPersonWithStay != null ? Number(b.perPersonWithStay) : perPersonTotal + stayPerPerson,
+      totalWithStay: b.totalWithStay != null ? Number(b.totalWithStay) : totalTotal + stayTotal,
+    };
   }
 
   // UI 读取预先算好的单日预算；未构建过时返回零值，避免 undefined 参与运算。
@@ -1610,6 +1676,7 @@
     conflictsFor,
     resolveBase,
     computeDayBudget: dayBudgetOf,
+    budgetColumns,
     SWAPS,
     FOOD_STYLES,
   };

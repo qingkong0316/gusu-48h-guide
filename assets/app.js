@@ -230,8 +230,8 @@
   const state = {
     preset: "couple",
     pace: "relaxed",
-    food: "classic",
-    experiences: ["boat", "pingtan", "sunset"],
+    food: "local",
+    experiences: ["boat", "sunset"],
     rainy: false,
     arrival: "10:30",
     departure: "20:40",
@@ -244,8 +244,8 @@
     foodFilter: "all",
     foodShown: 0,
     expShown: 0,
-    priceMin: null,
-    priceMax: null,
+    priceMin: 0,
+    priceMax: 50,
     priceFallback: false,
     student: false,
     customCards: [],
@@ -281,6 +281,8 @@
   let lastModalFocus = null;
   let lastSheetFocus = null;
   let railTick = false;
+  // 手动输入价位时防抖，避免每敲一个键就重排一次行程。
+  let priceReplanTimer = null;
 
   // 1024px 是“紧凑小卡 + 底部抽屉”的断点；分页基数、按钮文案都跟着它走。
   function isCompactLayout() {
@@ -310,6 +312,11 @@
     return `${String(h).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
   };
   const price = (n) => "¥" + Number(n).toLocaleString("zh-CN");
+  // 取整差额可能是负数，写成 -¥4 而不是 ¥-4。
+  const signedPrice = (n) => {
+    const v = Number(n) || 0;
+    return v < 0 ? `-¥${Math.abs(v).toLocaleString("zh-CN")}` : `+¥${v.toLocaleString("zh-CN")}`;
+  };
   const esc = (value) =>
     String(value == null ? "" : value)
       .replace(/&/g, "&amp;")
@@ -446,8 +453,15 @@
       source.priceMin != null ? source.priceMin : source.pmin,
       source.priceMax != null ? source.priceMax : source.pmax
     );
-    if (pmin != null) out.priceMin = pmin;
-    if (pmax != null) out.priceMax = pmax;
+    // 存档里带这两个键就说明用户自己选过价位，「不限」也要能原样存回来。
+    const hasRange = ["priceMin", "priceMax", "pmin", "pmax"].some((k) =>
+      Object.prototype.hasOwnProperty.call(source, k) && source[k] !== undefined
+    );
+    if (hasRange) {
+      out.priceRangeSet = true;
+      out.priceMin = pmin;
+      out.priceMax = pmax;
+    }
     if (source.student === true || source.student === "1" || source.student === "true" || source.stu === "1") out.student = true;
     if (source.day === 1 || source.day === 2) out.day = source.day;
     if (source.mapFilter && ["day1", "day2", "all", "food", "experience"].includes(source.mapFilter)) out.mapFilter = source.mapFilter;
@@ -465,6 +479,9 @@
       next.experiences = [...preset.experiences];
       next.rainy = !!preset.rainy;
       next.overrides = {};
+      // 预设自带价位区间：默认情侣漫游就是人均 ≤¥50 的本地小吃预算。
+      next.priceMin = preset.priceMin != null ? preset.priceMin : null;
+      next.priceMax = preset.priceMax != null ? preset.priceMax : null;
     } else if (prefs.preset === "custom") {
       next.preset = "custom";
     }
@@ -478,8 +495,11 @@
     if (prefs.startDate) next.startDate = prefs.startDate;
     if (prefs.endDate) next.endDate = prefs.endDate;
     if (prefs.overrides) next.overrides = { ...prefs.overrides };
-    if (prefs.priceMin != null) next.priceMin = prefs.priceMin;
-    if (prefs.priceMax != null) next.priceMax = prefs.priceMax;
+    // 只有存档里带 priceRangeSet 才代表用户自己选过价位，「不限」也要原样恢复。
+    if (prefs.priceRangeSet) {
+      next.priceMin = prefs.priceMin != null ? prefs.priceMin : null;
+      next.priceMax = prefs.priceMax != null ? prefs.priceMax : null;
+    }
     if (prefs.student != null) next.student = !!prefs.student;
     if (prefs.day) next.day = prefs.day;
     if (prefs.mapFilter) next.mapFilter = prefs.mapFilter;
@@ -489,7 +509,7 @@
 
   function loadInitialState() {
     let next = hydrateState(state, { preset: "couple" });
-    const saved = validatePrefs(readJSON("gusu.state.v1"));
+    const saved = validatePrefs(readJSON("gusu.state.v2"));
     if (saved) next = hydrateState(next, saved);
     const params = new URLSearchParams(location.search);
     if (Array.from(params.keys()).length) {
@@ -504,8 +524,9 @@
         station: params.get("station"),
         startDate: params.get("start"),
         endDate: params.get("end"),
-        pmin: params.get("pmin"),
-        pmax: params.get("pmax"),
+        // 只有链接里真带了价位参数才算用户选过，否则会把预设的价位区间抹掉。
+        pmin: params.has("pmin") ? params.get("pmin") : undefined,
+        pmax: params.has("pmax") ? params.get("pmax") : undefined,
         stu: params.get("stu"),
       };
       next = hydrateState(next, validatePrefs(raw));
@@ -514,7 +535,8 @@
   }
 
   function saveState() {
-    safeSet("gusu.state.v1", JSON.stringify({
+    // v2：默认预设换了价位区间与食单风格，旧存档会把老方案带回来，所以换 key。
+    safeSet("gusu.state.v2", JSON.stringify({
       preset: state.preset,
       pace: state.pace,
       food: state.food,
@@ -874,7 +896,7 @@
         : "苏博 + 园林";
     $("#resultRoute").textContent = state.pace === "packed" ? "D1 古城东 + 狮子林 · D2 古城西 → 湖东" : "D1 古城东 · D2 古城西 → 湖东";
     $("#resultWalk").textContent = `约 ${state.pace === "packed" ? "1.8" : state.pace === "balanced" ? "1.6" : "1.4"} 万步 / 天`;
-    $("#resultBudget").textContent = `${price(state.budget.perPerson)} / 人`;
+    $("#resultBudget").textContent = `${price(state.budget.total)} 两人`;
     $("#resultBooking").textContent = booking;
     updateGeneratorHint();
     renderResultHero();
@@ -919,6 +941,7 @@
       ...(meta.dateWarnings || []),
       ...(meta.customWarnings || []),
       ...(meta.stayWarnings || []),
+      ...(meta.foodNotes || []),
       ...(day1.warnings || []),
       ...(day2.warnings || []),
     ]));
@@ -945,7 +968,7 @@
           <div><dt>到达</dt><dd>${esc(state.arrival)} · ${esc(state.station)}</dd></div>
           <div><dt>返程</dt><dd>${esc(state.departure)} · ${esc(state.station)}</dd></div>
           <div><dt>住宿</dt><dd>${esc(baseLabel)}</dd></div>
-          <div><dt>人均</dt><dd>${price(budget.perPerson)}${budgetRows.stay ? ` / 含住宿 ${price(budget.perPersonWithStay)}` : ""}</dd></div>
+          <div><dt>预算</dt><dd>两人 ${price(budget.total)} · 人均 ${price(budget.perPerson)}${budgetRows.stay ? ` · 含住宿共 ${price(budget.totalWithStay)}` : ""}</dd></div>
         </dl>
         <p class="tiny">数据基准 2026-10 · 地图点位为行程示意</p>
       `;
@@ -955,25 +978,36 @@
   function renderBudget() {
     const b = state.budget;
     if (!b) return;
-    const rows = [
-      ["门票", b.rows.ticket, "含寺院香火券"],
-      ["餐饮", b.rows.food, "正餐与小食"],
-      ["体验", b.rows.exp, "船 / 评弹 / 汉服 / 夜游"],
-      ["自定义", b.rows.custom, "手动卡片（按人均）"],
-      ["市内交通", b.rows.transit, "打车分摊 + 公交预留"],
-      ["小吃预留", b.rows.buffer, "饮料 / 临时加餐"],
-      ["住宿", b.rows.stay, b.stayMissing ? "基地住宿未填价格" : "手动填写的基地住宿"],
+    const cols = PLANNER.budgetColumns(b);
+    const LABELS = [
+      ["ticket", "门票", "含寺院香火券"],
+      ["food", "餐饮", "正餐与小食"],
+      ["exp", "体验", "船 / 评弹 / 汉服 / 夜游"],
+      ["custom", "自定义", "手动卡片（按人均）"],
+      ["transit", "市内交通", "打车分摊 + 公交预留"],
+      ["buffer", "小吃预留", "饮料 / 临时加餐"],
     ];
-    const always = new Set(["门票", "市内交通", "住宿"]);
-    $("#budgetRows").innerHTML = rows
-      .filter(([label, value]) => always.has(label) || (Number(value) || 0) > 0)
-      .map(([label, value, note]) => `
-      <div class="budget-row"><span>${label} <small>· ${note}</small></span><b>${price(Number(value) || 0)}</b></div>
-    `).join("");
-    $("#budgetTotal").textContent = price(b.total);
-    $("#budgetNote").textContent = b.rows.stay
-      ? `人均 ${price(b.perPerson)}（不含住宿）· 两人不含住宿 ${price(b.total)} · 含住宿合计 ${price(b.totalWithStay)}`
-      : `人均 ${price(b.perPerson)}（不含住宿）· 两人不含住宿 ${price(b.total)}；未添加住宿基地价格，住宿未计入。`;
+    const always = new Set(["ticket", "transit"]);
+    const rows = cols.rows.filter((r) => always.has(r.key) || r.perPerson > 0);
+    let html = rows.map((r) => {
+      const meta = LABELS.find((x) => x[0] === r.key) || [r.key, r.key, ""];
+      return `<div class="budget-row"><span>${meta[1]} <small>· ${meta[2]}</small></span><span class="budget-nums"><b>${price(r.total)}</b><i>人均 ${price(r.perPerson)}</i></span></div>`;
+    }).join("");
+    if (cols.roundPerPerson !== 0 || cols.roundTotal !== 0) {
+      html += `<div class="budget-row budget-row--round"><span>取整 <small>· 按 ¥10 取整</small></span><span class="budget-nums"><b>${signedPrice(cols.roundTotal)}</b><i>人均 ${signedPrice(cols.roundPerPerson)}</i></span></div>`;
+    }
+    $("#budgetRows").innerHTML = html;
+    $("#budgetTotal").innerHTML = `${price(cols.totalTotal)}<i>人均 ${price(cols.perPersonTotal)}</i>`;
+    // 住宿是两人一份房费，单独一行，不参与上面两列的加总。
+    const stayEl = $("#budgetStay");
+    if (stayEl) {
+      stayEl.innerHTML = cols.stay.total > 0
+        ? `<span>住宿 <small>· 两人房费 ${cols.stay.nights || 1} 晚</small></span><span class="budget-nums"><b>${price(cols.stay.total)}</b><i>人均 ${price(cols.stay.perPerson)}</i></span>`
+        : `<span>住宿 <small>· 未填房价</small></span><span class="budget-nums"><b>—</b><i>未计入合计</i></span>`;
+    }
+    $("#budgetNote").textContent = cols.stay.total > 0
+      ? `两人合计 ${price(cols.totalTotal)}（人均 ${price(cols.perPersonTotal)}），不含住宿；加上住宿共 ${price(cols.totalWithStay)}（人均 ${price(cols.perPersonWithStay)}）。`
+      : `两人合计 ${price(cols.totalTotal)}（人均 ${price(cols.perPersonTotal)}），不含住宿；填上房价后房费会一起算进去。`;
   }
 
   function updateDateUI() {
@@ -1064,6 +1098,7 @@
     const rawMax = numOrNull(max);
     const swapped = rawMin != null && rawMax != null && rawMin > rawMax;
     const [a, b] = normalizePriceRange(min, max);
+    const changed = a !== state.priceMin || b !== state.priceMax;
     state.priceMin = a;
     state.priceMax = b;
     state.foodShown = 0;
@@ -1075,6 +1110,25 @@
     updateGeneratorHint();
     renderRail();
     if (fromInput && swapped) showToast("价位已自动按小到大排序。");
+    if (!changed) return;
+    state.preset = "custom";
+    if (fromInput) {
+      // 手动输入逐字触发，防抖后再排，避免每敲一个键就重排一次。
+      clearTimeout(priceReplanTimer);
+      priceReplanTimer = setTimeout(replanAfterPriceChange, 250);
+    } else {
+      replanAfterPriceChange();
+    }
+  }
+
+  // 价位筛选决定行程选哪几家店，必须立刻重排，否则时间线与预算还是旧值。
+  function replanAfterPriceChange() {
+    const before = state.budget ? state.budget.perPerson : null;
+    generate(false);
+    const after = state.budget ? state.budget.perPerson : null;
+    if (before != null && after != null && before !== after) {
+      showToast(`已按人均价位重排，两人合计 ${price(after * 2)}。`);
+    }
   }
 
   function updateGeneratorHint() {
@@ -1082,7 +1136,7 @@
       .map((k) => (EXP_OPTIONS.find((o) => o.key === k) || {}).label)
       .filter(Boolean);
     const priceText = state.priceMin == null && state.priceMax == null ? "" : ` · 人均 ${priceRangeLabel()}`;
-    const fallback = state.priceFallback ? " · 部分餐位保留默认" : "";
+    const fallback = state.priceFallback ? " · 有餐位换成了最接近价位的店" : "";
     const student = state.student ? " · 学生票" : "";
     const hint = $("#generatorHint");
     if (hint) hint.textContent = `${PACE_LABEL[state.pace]} · ${FOOD_LABEL[state.food]}${priceText}${student} · ${expLabels.length ? expLabels.join(" + ") : "不额外安排体验"}${fallback}`;
@@ -1274,14 +1328,13 @@
   function renderRail() {
     if (!$("#sideRail")) return;
     const budget = state.budget;
-    const withStay = !!(budget && budget.rows && budget.rows.stay > 0);
     if ($("#railBudget")) {
-      $("#railBudget").textContent = budget ? price(withStay ? budget.perPersonWithStay : budget.perPerson) : "—";
+      // 侧栏与预算卡同一口径：人均、不含住宿。
+      $("#railBudget").textContent = budget ? price(budget.perPerson) : "—";
     }
     if ($("#railBudgetLabel")) {
-      const label = ["人均预算"];
+      const label = ["人均预算", "不含住宿"];
       if (state.student) label.push("学生");
-      if (withStay) label.push("含住宿");
       $("#railBudgetLabel").textContent = label.join(" · ");
     }
     const toggler = $("#railStudentToggle");
@@ -2612,8 +2665,6 @@
       if (index >= 0) state.foodShown = Math.max(state.foodShown || foodPageSize(), index + 1);
       renderFoodFilters();
       renderFoodGrid();
-      // 价位筛选会影响时间线/预算；清掉后重排一次，避免界面口径不一致。
-      if (wasPriceFiltered) generate(false);
     }
     const day = state.plan ? state.plan.days.find((d) => d.blocks.some((b) => b.type === "place" && b.placeId === id)) : null;
     if (day && state.day !== day.day) {
@@ -2700,7 +2751,7 @@
     lines.push("拙政园 / 留园 / 虎丘：提前 7 天实名分时预约，带身份证原件。");
     lines.push("网师园夜花园：¥120/人，官方公众号实名预约；琵琶语评弹提前确认吴亮莹场次。");
     lines.push("");
-    lines.push(`【预算】人均约 ${price(state.budget.perPerson)}（不含住宿），两人不含住宿约 ${price(state.budget.total)}${state.budget.rows.stay ? `；含住宿约 ${price(state.budget.totalWithStay)}` : ""}。`);
+    lines.push(`【预算】两人合计约 ${price(state.budget.total)}（人均 ${price(state.budget.perPerson)}，不含住宿）${state.budget.rows.stay ? `；加上住宿共 ${price(state.budget.totalWithStay)}` : ""}。`);
     lines.push("【说明】点评摘录与票价来自公开资料，出发前请以平台实时信息为准。");
     return lines.join("\n");
   }
@@ -2751,7 +2802,7 @@
     // 只在用户主动生成或状态区域为空时播报，避免筛选/换价位时反复打断读屏。
     const generateStatus = $("#generateStatus");
     if (generateStatus && (scrollTo || !generateStatus.textContent)) {
-      generateStatus.textContent = `已生成 ${result.plan.days[0].date} 至 ${result.plan.days[1].date} 行程，人均 ${price(state.budget.perPerson)}。`;
+      generateStatus.textContent = `已生成 ${result.plan.days[0].date} 至 ${result.plan.days[1].date} 行程，两人合计 ${price(state.budget.total)}（人均 ${price(state.budget.perPerson)}，不含住宿）。`;
     }
     if (!state.plan.days.some((d) => d.day === state.day)) state.day = 1;
     state.mapFilter = `day${state.day}`;
@@ -2784,8 +2835,8 @@
     state.experiences = [...preset.experiences];
     state.rainy = !!preset.rainy;
     state.student = false;
-    state.priceMin = null;
-    state.priceMax = null;
+    state.priceMin = preset.priceMin != null ? preset.priceMin : null;
+    state.priceMax = preset.priceMax != null ? preset.priceMax : null;
     state.priceFallback = false;
     state.overrides = {};
     state.day = 1;
@@ -3284,7 +3335,6 @@
       const p = PRICE_PRESETS.find((preset) => preset.id === btn.dataset.railPrice);
       if (!p) return;
       setPriceRange(p.min, p.max, false);
-      generate(false);
       showToast(`已按「${p.label}」筛选并重排。`);
     });
     $("#railShare").addEventListener("click", sharePlanLink);
