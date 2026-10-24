@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#1f2a26">
+  <meta name="description" content="苏州两天一夜情侣漫游攻略：园林、水巷、评弹与金鸡湖日落。真实地图、可一键生成行程、餐厅点评搜索。">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <title>姑苏两日 · 与君慢行｜苏州情侣 48 小时</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700;900&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="preload" as="image" href="assets/images/hero-canal.svg">
+  <link rel="stylesheet" href="assets/vendor/leaflet.css">
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到正文</a>
+  <div class="paper-grain" aria-hidden="true"></div>
+
+  <div class="app-shell">
+    <aside class="side-rail" id="sideRail" aria-label="攻略侧栏">
+      <div class="rail-head">
+        <a class="rail-brand" href="#top" aria-label="回到顶部">
+          <span class="brand-seal">蘇</span>
+          <span class="brand-text"><b>姑苏行记</b><small>SUZHOU / 48H</small></span>
+        </a>
+        <button class="rail-close" id="railClose" type="button" aria-label="关闭侧栏">×</button>
+      </div>
+
+      <div class="rail-trip">
+        <div class="rail-eyebrow">TRIP CARD</div>
+        <div class="rail-date" id="railDates">10.27 <span>—</span> 10.28</div>
+        <p id="railWeekday">周二出发 · 周三夜归 · 2 人</p>
+        <div class="rail-stats">
+          <span id="railBudgetLabel">人均预算</span>
+          <b id="railBudget">¥990</b>
+        </div>
+        <div class="rail-exp" id="railExp"></div>
+      </div>
+
+      <nav class="rail-nav" id="railNav" aria-label="章节导航">
+        <span class="rail-nav-label">资料库</span>
+        <a href="#map-transit" data-rail="map-transit" class="is-current" aria-current="true"><b>01</b><span>地图 &amp; 通勤</span></a>
+        <a href="#food" data-rail="food"><b>02</b><span>食单</span></a>
+        <a href="#experiences" data-rail="experiences"><b>03</b><span>体验</span></a>
+        <a href="#stay" data-rail="stay"><b>04</b><span>住宿</span></a>
+        <a href="#prep" data-rail="prep"><b>05</b><span>行前</span></a>
+        <a href="#sources" data-rail="sources"><b>06</b><span>资料与出处</span></a>
+        <span class="rail-nav-label">你的行程</span>
+        <a href="#generator" data-rail="generator"><b>07</b><span>定制生成</span></a>
+        <a href="#itinerary" data-rail="itinerary"><b>08</b><span>你的两日</span></a>
+      </nav>
+
+      <div class="rail-block">
+        <div class="rail-block-head"><span>快速筛选</span><a href="#generator">更多 ↗</a></div>
+        <label class="rail-student"><input type="checkbox" id="railStudentToggle"><span>学生票半价</span></label>
+        <div class="rail-price" id="railPricePresets"></div>
+      </div>
+
+      <div class="rail-block">
+        <div class="rail-block-head"><span>预约进度</span><b id="railCheckText">0 / 7</b></div>
+        <div class="rail-progress"><i id="railCheckBar"></i></div>
+        <a class="rail-link" href="#prep">打开预约清单 →</a>
+      </div>
+
+      <div class="rail-actions">
+        <button id="railShare" type="button">分享</button>
+        <button id="railCopy" type="button">复制行程</button>
+        <button id="railPrint" type="button">打印 / PDF</button>
+        <a href="#generator">定制 48 小时 ↗</a>
+      </div>
+      <p class="rail-foot">SUZHOU · 2026.10<br>底图 © 高德地图</p>
+    </aside>
+    <div class="rail-backdrop" id="railBackdrop" hidden></div>
+
+    <div class="app-main">
+
+  <header class="site-header" id="siteHeader">
+    <div class="header-inner">
+      <a class="brand" href="#top" aria-label="回到顶部">
+        <span class="brand-seal">蘇</span>
+        <span class="brand-text"><b>姑苏行记</b><small>SUZHOU / 48H</small></span>
+      </a>
+      <div class="header-actions">
+        <button class="btn btn-ghost btn-sm" id="btnShareTop" type="button">分享</button>
+        <button class="btn btn-red btn-sm" id="btnGenerateTop" type="button">一键生成</button>
+        <button class="nav-toggle" id="navToggle" type="button" aria-label="打开侧栏" aria-expanded="false" aria-controls="sideRail">
+          <span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="hero-media"><img src="assets/images/hero-canal.svg" alt="苏州平江路傍晚，情侣站在石桥上看摇橹船经过" fetchpriority="high"></div>
+      <div class="hero-shade" aria-hidden="true"></div>
+      <div class="hero-inner">
+        <div class="hero-copy">
+          <p class="eyebrow"><span></span> SUZHOU · 48 HOURS FOR TWO</p>
+          <h1>姑苏两日<br><span>与君慢行</span></h1>
+          <p class="hero-lead">从园林的一扇窗，到水巷的一盏灯，<br>再到金鸡湖的日落。把两天苏州，留给两个人。</p>
+          <div class="hero-meta">
+            <span class="meta-pill" id="heroDates">10.27 — 10.28</span>
+            <span class="meta-pill">2 天 1 夜</span>
+            <span class="meta-pill">情侣漫游</span>
+            <span class="meta-pill" id="heroWeekday">周二出发 · 周三夜归 · 2 人</span>
+          </div>
+          <div class="hero-actions">
+            <button class="btn btn-red btn-lg" id="heroGenerate" type="button">
+              <span>一键生成我们的 48 小时</span><span class="btn-arrow" aria-hidden="true">↗</span>
+            </button>
+            <a class="btn btn-outline-light btn-lg" href="#map-transit">先看地图</a>
+          </div>
+        </div>
+        <aside class="hero-quote" aria-label="诗句">
+          <span class="vertical-seal">蘇</span>
+          <p>君到姑苏见<br>人家尽枕河</p>
+          <small>唐 · 杜荀鹤</small>
+        </aside>
+      </div>
+      <div class="hero-bottom">
+        <div class="hero-stats">
+          <div><b>02</b><span>天 · 一夜</span></div>
+          <div><b>06</b><span>处核心停留</span></div>
+          <div><b>01</b><span>场吴侬评弹</span></div>
+          <div><b>01</b><span>次湖上日落</span></div>
+        </div>
+        <a href="#map-transit" class="scroll-cue" aria-label="继续向下">
+          <span>慢慢往下</span><i aria-hidden="true"></i>
+        </a>
+      </div>
+      <span class="ai-mark">AI 意境图 · 非实景</span>
+    </section>
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    <div class="map-transit-chapter" id="map-transit">
+    <section class="map-section section" id="map-section">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <div>
+            <p class="section-kicker"><span>01</span> ROUTE &amp; MAP</p>
+            <h2>一张地图，<br><em>把两天摊开</em></h2>
+          </div>
+          <p class="section-desc">点位、食单、体验、住宿基地和当天通勤路线都收在同一张图上。切 D1 / D2 看高亮路线，右侧面板可切换点位与通勤段。</p>
+        </header>
+        <div class="map-layout map-layout--single">
+          <div class="map-card reveal">
+            <div class="map-toolbar">
+              <div class="map-filters" id="mapFilters"></div>
+              <div class="map-day-toggle" id="mapDayToggle">
+                <button type="button" data-day="1">D1</button>
+                <button type="button" data-day="2">D2</button>
+              </div>
+            </div>
+            <div id="map" class="map map--single" role="region" aria-label="苏州行程地图：点位与当天路线" aria-describedby="mapList"></div>
+            <div class="map-fallback" id="mapFallback" role="status" aria-live="polite" hidden>
+              <div class="map-fallback-head">
+                <b>底图暂时不可用</b>
+                <span>点位列表、通勤段和外部导航仍可使用。</span>
+                <button type="button" id="mapRetry">重试底图</button>
+              </div>
+              <div class="map-schematic" id="mapSchematic" role="img" aria-live="off" aria-label="苏州行程点位与路线示意图 · 底图不可用"></div>
+            </div>
+            <div class="map-foot">
+              <span><i class="dot dot-walk"></i>步行</span>
+              <span><i class="dot dot-taxi"></i>打车</span>
+              <span><i class="dot dot-boat"></i>船</span>
+              <span><i class="dot dot-d1"></i>Day 1</span>
+              <span><i class="dot dot-d2"></i>Day 2</span>
+              <span><i class="dot dot-food"></i>食单</span>
+              <span><i class="dot dot-exp"></i>体验</span>
+              <span class="map-credit">底图 © 高德地图 · 高亮线为当天路线 · 虚线步行 / 实线打车</span>
+            </div>
+            <div class="map-notice" id="mapNotice" role="status" aria-live="polite" hidden>地图瓦片暂时加载失败。行程、点位列表和外部导航仍然可用。</div>
+          </div>
+          <aside class="map-panel reveal">
+            <div class="map-panel-tabs" id="mapPanelTabs" role="tablist" aria-label="地图信息面板">
+              <button type="button" role="tab" data-map-pane="points" class="is-active" aria-selected="true" aria-controls="mapPointsPane">点位</button>
+              <button type="button" role="tab" data-map-pane="transit" aria-selected="false" aria-controls="mapTransitPane">通勤段</button>
+            </div>
+            <div id="mapPointsPane" class="map-pane" role="tabpanel">
+              <div class="map-panel-head">
+                <div><span id="mapListKicker">TODAY</span><h3 id="mapListTitle">Day 1 · 古城东</h3></div>
+                <span class="count" id="mapCount">0 个点</span>
+              </div>
+              <div class="map-list" id="mapList"></div>
+              <a class="map-open" id="mapOpenAmap" href="https://uri.amap.com/search?keyword=%E8%8B%8F%E5%B7%9E&city=%E8%8B%8F%E5%B7%9E" target="_blank" rel="noopener">在高德中打开苏州 →</a>
+            </div>
+            <div id="mapTransitPane" class="map-pane" role="tabpanel" hidden>
+              <div class="map-panel-head">
+                <div><span>ROUTE</span><h3 id="transitPaneTitle">Day 1 · 通勤段</h3></div>
+                <span class="count" id="transitCount">0 段</span>
+              </div>
+              <div class="transit-summary" id="transitSummary"></div>
+              <ol class="leg-list" id="legList"></ol>
+              <p class="tiny map-credit" id="transitBaseNote"></p>
+            </div>
+          </aside>
+        </div>
+        <div class="mode-grid">
+          <article class="mode-card"><span>01</span><h3>步行</h3><p>古城东片区（苏博—拙政园—平江路）基本靠走；穿一双软底鞋，比什么都重要。</p><b>0 元 · 10–25 分钟</b></article>
+          <article class="mode-card"><span>02</span><h3>地铁</h3><p>1 号线串古城与园区，2 号线接苏州站/山塘，4 号线到北寺塔。支付宝乘车码或“苏 e 行”。</p><b>¥2–5 · 约 20 分钟</b></article>
+          <article class="mode-card"><span>03</span><h3>打车</h3><p>带行李、跨片区、赶日落时用。古城内短途 ¥10–20，古城到湖东约 ¥30–40。</p><b>¥10–40 · 10–30 分钟</b></article>
+          <article class="mode-card"><span>04</span><h3>摇橹船 / 画舫</h3><p>平江路 ¥40/人、山塘画舫约 ¥40–50/人。它是体验，不是“最省时间”的交通。</p><b>¥40–50/人</b></article>
+          <article class="mode-card"><span>05</span><h3>高铁 / 城际</h3><p>苏州站离古城最近；园区站离金鸡湖近。返程预留 40 分钟到站。</p><b>按车次 · 提前 40 分钟</b></article>
+        </div>
+      </div>
+    </section>
+    </div>
+
+    <section class="quote-band" aria-label="江南引语">
+      <img src="assets/images/garden-couple.svg" alt="苏州园林月洞门前的秋日情侣" loading="lazy">
+      <div class="quote-band-shade"></div>
+      <div class="quote-band-inner">
+        <p>“江南的浪漫，不在景点里，<br>在你们愿意为彼此慢下来的那一段路。”</p>
+        <span>DAY 1 · 拙政园到平江路</span>
+      </div>
+    </section>
+
+    <section class="food-section section" id="food">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <div>
+            <p class="section-kicker"><span>02</span> THE TABLE</p>
+            <h2>一张给两个人的<br><em>苏州食单</em></h2>
+          </div>
+          <p class="section-desc">不是“必吃榜”复读机。每家都写了招牌、人均、口碑摘录，以及点评搜索 / 美团搜索入口。评分以平台实时为准。</p>
+        </header>
+        <div class="food-hero reveal">
+          <img src="assets/images/cuisine.svg" alt="松鼠鳜鱼、苏式面、生煎与海棠糕" loading="lazy">
+          <div class="food-hero-copy">
+            <span>苏帮菜 · 面点 · 小吃 · 湖边晚餐</span>
+            <p>两个人点三菜，生煎先咬小口，面要趁热。苏州菜偏甜，落座时先说“少糖”，会舒服很多。</p>
+          </div>
+        </div>
+        <div class="food-filters" id="foodFilters"></div>
+        <div class="price-bar">
+          <div class="price-bar-main">
+            <span class="price-bar-label">人均价位</span>
+            <div class="chip-row" id="foodPricePresets"></div>
+          </div>
+          <div class="price-inputs price-inputs--light">
+            <label>¥ <input id="foodPriceMin" type="number" min="0" step="10" placeholder="最低" aria-label="食单最低人均"></label>
+            <span>—</span>
+            <label>¥ <input id="foodPriceMax" type="number" min="0" step="10" placeholder="最高" aria-label="食单最高人均"></label>
+            <button type="button" class="price-clear" id="foodPriceClear">不限</button>
+          </div>
+        </div>
+        <div class="food-count-row">
+          <span id="foodCount">共 57 家</span>
+          <button type="button" class="text-btn" id="foodLoadMore">再看一些</button>
+        </div>
+        <div class="food-grid" id="foodGrid"></div>
+        <div class="food-note reveal">
+          <p><b>点菜小抄：</b>松鼠鳜鱼 2 人吃一份就够；响油鳝糊趁热拌；枫镇大肉面先喝一口白汤；生煎先开窗、后喝汤；油氽团子一人一个刚好，多了会腻。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="experience-section section" id="experiences">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <div>
+            <p class="section-kicker"><span>03</span> ONLY IN SUZHOU</p>
+            <h2>只有苏州才有的<br><em>几个时刻</em></h2>
+          </div>
+          <p class="section-desc">不赶场。选 2–3 个真正想一起做的，剩下的时间用来走路和发呆。</p>
+        </header>
+        <div class="experience-grid" id="experienceGrid"></div>
+      </div>
+    </section>
+
+    <section class="stay-section section" id="stay">
+      <div class="wrap stay-layout">
+        <div class="stay-media reveal">
+          <img src="assets/images/garden-couple.svg" alt="秋日苏州园林里的情侣背影" loading="lazy">
+          <span class="stay-caption">把你们订好的住处，放在这里。</span>
+        </div>
+        <div class="stay-copy reveal">
+          <p class="section-kicker"><span>04</span> WHERE TO STAY</p>
+          <h2>住哪儿，<br><em>你们自己填</em></h2>
+          <p class="lead">这一栏不做推荐。把你们已经订好、或正在考虑的住宿写进来：名称、区域、入住/退房、价格和预订链接。页面只负责把它们收在一起，方便出发前一眼确认。</p>
+          <form id="stayForm" class="stay-form">
+            <div class="stay-form-row">
+              <label>住宿名称<input id="stayName" required maxlength="40" placeholder="酒店 / 民宿名称"></label>
+              <label>大致区域
+                <select id="stayAreaKey">
+                  <option value="pingjiang">平江路</option>
+                  <option value="guanqian">观前街</option>
+                  <option value="shantang">山塘街</option>
+                  <option value="jinji">金鸡湖</option>
+                  <option value="other">其他 / 不确定</option>
+                </select>
+              </label>
+            </div>
+            <label class="stay-form-wide">具体位置 / 备注<input id="stayAreaDetail" maxlength="30" placeholder="如：平江路北端、某酒店名（可选）"></label>
+            <div class="stay-form-row">
+              <label>入住<input id="stayCheckin" type="date"></label>
+              <label>退房<input id="stayCheckout" type="date"></label>
+            </div>
+            <div class="stay-form-row">
+              <label>每晚价格<input id="stayPrice" type="number" min="0" step="10" inputmode="numeric" placeholder="如 200"></label>
+              <label>预订链接<input id="stayLink" type="url" placeholder="https://（可选）"></label>
+            </div>
+            <p class="stay-form-wide tiny">按每晚房价填；只有勾选“本次住宿基地”的住宿才计入预算。示例：¥200。</p>
+            <label class="stay-form-wide">备注<input id="stayNote" maxlength="80" placeholder="房型 / 是否含早 / 取消政策"></label>
+            <label class="stay-base-toggle"><input type="checkbox" id="stayBase"> 设为本次住宿基地（用于通勤估算）</label>
+            <p class="tiny" style="margin:0">只有一处住宿可作为基地；通勤与含住宿预算会按它重算，未设置时按平江路估算。</p>
+            <div class="stay-form-actions">
+              <button class="btn btn-ink" type="submit">＋ 添加住宿</button>
+              <span class="tiny">只保存在本机浏览器</span>
+            </div>
+          </form>
+          <div id="stayList" class="stay-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="prep-section section" id="prep">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <div>
+            <p class="section-kicker"><span>05</span> BEFORE YOU LEAVE</p>
+            <h2>行前 10 分钟，<br><em>把坑先填掉</em></h2>
+          </div>
+          <p class="section-desc">预约、预算、交通、下雨和避坑，全部放在这一页。能勾的先勾掉。</p>
+        </header>
+        <div class="prep-grid">
+          <article class="prep-card prep-booking reveal">
+            <header><span>01</span><h3>预约倒计时</h3><p>按入园日倒推</p></header>
+            <div class="checklist" id="bookingChecklist"></div>
+            <div class="progress-line"><span id="checkProgressBar"></span></div>
+            <p class="tiny" id="checkProgressText">0 / 6 已完成</p>
+          </article>
+          <article class="prep-card reveal">
+            <header><span>02</span><h3>两个人的预算</h3><p>不含住宿 · 随方案变化</p></header>
+            <div class="budget-rows" id="budgetRows"></div>
+            <div class="budget-total"><span>两人合计</span><b id="budgetTotal">—</b></div>
+            <p class="tiny" id="budgetNote">按当前生成方案估算；含门票、餐饮、体验与市内交通。</p>
+          </article>
+          <article class="prep-card reveal">
+            <header><span>03</span><h3>怎么走、行李放哪</h3><p>少折返的交通小抄</p></header>
+            <ul class="icon-list">
+              <li><b>苏州站 → 平江路</b><span>打车 10–15 分钟（约 ¥15）；带行李别挤地铁。</span></li>
+              <li><b>古城内</b><span>苏博—拙政园—狮子林—平江路基本步行可达；穿舒服的鞋。</span></li>
+              <li><b>古城 → 湖东</b><span>地铁 1 号线到文化博览中心/东方之门，约 20–25 分钟；打车约 ¥35。</span></li>
+              <li><b>行李</b><span>寄存在酒店；苏博正门、留园游客中心也有免费大件寄存。</span></li>
+            </ul>
+          </article>
+          <article class="prep-card reveal">
+            <header><span>04</span><h3>下雨也不慌</h3><p>把户外换成室内</p></header>
+            <ul class="icon-list">
+              <li><b>换掉</b><span>摇橹船 / 汉服外拍 / 湖边久坐。</span></li>
+              <li><b>换成</b><span>苏博西馆、诚品、苏州中心、评弹、网师园夜游（室内演出）。</span></li>
+              <li><b>留园的雨天</b><span>回廊听雨是加分项，不是减分项；带一双防滑鞋。</span></li>
+              <li><b>一键切换</b><span>在上面的生成器点“雨天备选”，路线会自动改。</span></li>
+            </ul>
+          </article>
+          <article class="prep-card wide reveal">
+            <header><span>05</span><h3>本地人避坑实录</h3><p>不是吓你，是少花冤枉钱</p></header>
+            <div class="trap-grid">
+              <div><b>火车站“一日游”</b><p>“几百块游遍四大园林”多半带购物点，坚决拒绝。</p></div>
+              <div><b>平江路“私船”</b><p>只在官方码头买票；路边拉客的船不要上。</p></div>
+              <div><b>山塘街“免费送花”</b><p>接了就要钱；笑笑走开。</p></div>
+              <div><b>景区“手工特产”</b><p>颜色过艳的桂花糕、现做龙须糖，溢价高；去老字号买。</p></div>
+              <div><b>西园寺门口算命</b><p>奶奶很热情，但不必理会；寺内素面才是正事。</p></div>
+              <div><b>音乐喷泉</b><p>不是每天开；别为了它把行程卡死。</p></div>
+            </div>
+          </article>
+          <article class="prep-card wide reveal">
+            <header><span>06</span><h3>带什么</h3><p>10 月底的苏州，早晚有凉意</p></header>
+            <div class="pack-grid">
+              <span>薄风衣 / 针织开衫</span><span>舒服的平底鞋</span><span>折叠伞</span><span>充电宝</span>
+              <span>身份证（入园必刷）</span><span>少量现金（老店/小船）</span><span>防蚊液（湖边）</span><span>一个能装伴手礼的袋子</span>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="sources-section section" id="sources">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <div>
+            <p class="section-kicker"><span>06</span> SOURCES</p>
+            <h2>资料与出处，<br><em>都摊开给你看</em></h2>
+          </div>
+          <p class="section-desc">调研时间 2026 年 10 月。平台评分、营业时间和票价会变，出发前请再点一次官方链接复核。</p>
+        </header>
+        <details class="source-fold" id="sourceFold">
+          <summary>资料与出处（<span id="sourceCount">0</span> 条）</summary>
+          <div class="source-tools" id="sourceTools"></div>
+          <div class="source-groups" id="sourceGroups"></div>
+          <div class="data-note reveal">
+            <p><b>数据口径：</b>票价与开放时间来自官方/本地宝 2026 年 10 月页面；餐厅人均为公开信息综合，评分只在有明确来源时标注；口碑为公开用户评价的节选、压缩或摘要，摘要会单独标注，并附平台搜索/原文链接。没有编造评分。AI 配图为氛围示意，非实景。</p>
+            <p><b>可信度徽标：</b>官方来源＝有官方域名预约/官方出处；公开评价＝有明确平台/媒体来源；口碑摘要＝只有公开评价摘要；暂无来源＝未找到可引用的评价来源。</p>
+            <div class="confidence-legend" aria-label="数据可信度图例">
+              <span class="confidence confidence--official">官方来源</span>
+              <span class="confidence confidence--public">公开评价</span>
+              <span class="confidence confidence--summary">口碑摘要</span>
+              <span class="confidence confidence--none">暂无来源</span>
+            </div>
+            <p>本页已并入 <a href="research/苏州两天一夜学生情侣调研_2026.docx" download data-report-download>《苏州两天一夜学生情侣调研》（2026-10-23，小红书 70 帖索引）</a> 的学生票价、寒山寺、山塘亮灯/喷泉时间、双塔时段与小红书原帖链接。</p>
+            <p id="dateCheckSource"></p>
+            <p><a href="research/suzhou-notes.md" target="_blank" rel="noopener">查看完整调研笔记与筛选记录 →</a> · <a href="research/苏州两天一夜学生情侣调研_2026.docx" download data-report-download>下载学生情侣调研报告（小红书 70 帖）</a></p>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <section class="generator section" id="generator">
+      <div class="wrap">
+        <div class="generator-head reveal">
+          <div>
+            <p class="section-kicker light"><span>07</span> MAKE IT YOURS</p>
+            <h2>把偏好交给你们，<br><em>把顺路交给我们。</em></h2>
+          </div>
+          <p>先选一个起点，再微调。点“生成”后，时间线、地图路线、预算和预约清单会一起重排。</p>
+        </div>
+        <div class="generator-board reveal">
+          <div class="preset-row" id="presetRow" role="group" aria-label="行程预设"></div>
+          <div class="generator-controls">
+            <fieldset class="control-group">
+              <legend>节奏</legend>
+              <div class="segmented" id="paceControl">
+                <button type="button" data-pace="relaxed">慢游</button>
+                <button type="button" data-pace="balanced">标准</button>
+                <button type="button" data-pace="packed">紧凑</button>
+              </div>
+              <p class="field-note">节奏通过停留时长与自由活动压缩体现；固定每段缓冲会赶不上 20:40 返程。</p>
+            </fieldset>
+            <fieldset class="control-group">
+              <legend>吃什么</legend>
+              <div class="segmented" id="foodControl">
+                <button type="button" data-food="classic">老字号</button>
+                <button type="button" data-food="local">市井烟火</button>
+                <button type="button" data-food="splurge">仪式感</button>
+              </div>
+            </fieldset>
+            <fieldset class="control-group wide">
+              <legend>人均价位 <small>预设或手动输入</small></legend>
+              <div class="price-control price-control--dark">
+                <div class="chip-row" id="pricePresets"></div>
+                <div class="price-inputs">
+                  <label>¥ <input id="priceMin" type="number" min="0" step="10" placeholder="最低" aria-label="最低人均"></label>
+                  <span>—</span>
+                  <label>¥ <input id="priceMax" type="number" min="0" step="10" placeholder="最高" aria-label="最高人均"></label>
+                  <button type="button" class="price-clear" id="priceClear">不限</button>
+                </div>
+              </div>
+            </fieldset>
+            <fieldset class="control-group wide">
+              <legend>想一起做的事 <small>可多选</small></legend>
+              <div class="chip-row" id="experienceControl"></div>
+            </fieldset>
+            <fieldset class="control-group wide">
+              <legend>行程日期 <small>本页按两天一夜编排</small></legend>
+              <div class="date-range">
+                <label>出发 <input id="startDate" type="date" value="2026-10-27"></label>
+                <span aria-hidden="true">→</span>
+                <label>返程 <input id="endDate" type="date" value="2026-10-28"></label>
+              </div>
+              <p class="field-note">本页固定两天一夜；改出发日期会自动调整返程日期。星期、日落和喷泉提示随日期同步，票价/营业时间仍按 2026-10 基准。</p>
+            </fieldset>
+            <fieldset class="control-group">
+              <legend>到达</legend>
+              <label class="select-wrap"><select id="arrivalSelect" aria-label="到达苏州站时间"></select></label>
+              <p class="field-note">默认 10:30；报告里的 7:15 早起版需前一晚到古城或极早班车。</p>
+            </fieldset>
+            <fieldset class="control-group control-group--return">
+              <legend>返程</legend>
+              <div class="return-stack">
+                <label class="select-wrap"><select id="departureSelect" aria-label="返程发车时间"></select></label>
+                <label class="select-wrap"><select id="stationSelect" aria-label="返程车站"></select></label>
+              </div>
+            </fieldset>
+          </div>
+          <div class="generator-actions">
+            <button class="btn btn-cream btn-lg" id="btnGenerate" type="button"><span>生成我们的 48 小时</span><span aria-hidden="true">↗</span></button>
+            <button class="btn btn-outline-cream" id="btnRandom" type="button">换一版灵感</button>
+            <button class="btn btn-outline-cream" id="btnStudentPlan" type="button" title="学生票 + 人均≤100 + 摇橹船 + 寒山寺">学生省钱版</button>
+            <label class="student-toggle"><input type="checkbox" id="studentToggle"><span>学生票半价</span><small>带学生证</small></label>
+            <p class="generator-hint" id="generatorHint">默认：慢游 · 老字号 · 摇橹船 + 评弹 + 日落</p>
+          </div>
+          <div class="generator-result" id="generatorResult">
+            <div class="result-stat"><span>路线</span><b id="resultRoute">古城东 → 古城西 → 湖东</b></div>
+            <div class="result-stat"><span>步行</span><b id="resultWalk">约 1.6 万步 / 天</b></div>
+            <div class="result-stat"><span>人均</span><b id="resultBudget">¥930 起</b></div>
+            <div class="result-stat"><span>预约</span><b id="resultBooking">苏博 + 园林</b></div>
+          </div>
+          <p class="sr-only" id="generateStatus" role="status" aria-live="polite"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="itinerary section" id="itinerary">
+      <div class="wrap">
+        <div class="result-hero reveal">
+          <div class="result-hero-main">
+            <p class="section-kicker"><span>08</span> YOUR 48 HOURS</p>
+            <h2 id="resultTitle">两天的路，<em>已经顺好了</em></h2>
+            <p class="result-sub" id="resultSub">按你们的日期、预算和想做的事重排。</p>
+            <div class="result-tools">
+              <button class="btn btn-ghost btn-sm" id="btnAddCard" type="button">＋ 手动加一站</button>
+              <button class="btn btn-ghost btn-sm" id="btnExpandAll" type="button">展开全部</button>
+              <button class="icon-btn" id="btnPrint" type="button" title="打印或存为 PDF" aria-label="打印或存为 PDF">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6z"/></svg>
+              </button>
+              <button class="btn btn-ink" id="btnCopy" type="button">复制完整行程</button>
+            </div>
+            <div class="result-rationale" id="resultRationale"></div>
+            <div class="result-warnings" id="resultWarnings" role="status" aria-live="polite" hidden></div>
+          </div>
+          <aside class="result-tripcard" id="resultTripCard" aria-label="本次行程摘要"></aside>
+        </div>
+        <div class="date-note reveal" id="dateNote">
+          <span class="note-mark" aria-hidden="true">!</span>
+          <p id="dateCheckText" aria-live="polite"></p>
+          <button class="text-btn" id="btnReadDate" type="button">知道了</button>
+        </div>
+        <div class="day-tabs" id="dayTabs" role="tablist" aria-label="按天查看行程"></div>
+        <div class="itinerary-layout">
+          <div class="timeline" id="timeline" role="tabpanel" aria-labelledby="dayTab-1"></div>
+          <aside class="itinerary-aside">
+            <div class="aside-card" id="dayAside"></div>
+          </aside>
+        </div>
+        <div class="itinerary-foot reveal">
+          <div>
+            <h3>如果只做三件事</h3>
+            <p>提前约到苏博；傍晚坐一次摇橹船；把最后一顿留给湖边。</p>
+          </div>
+          <div class="foot-actions">
+            <button class="btn btn-red" id="btnGenerateInline" type="button">按这个方案再生成一次</button>
+            <a class="text-btn" href="#map-transit">在地图上走一遍 →</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-inner">
+      <div class="footer-brand"><span class="brand-seal">蘇</span><div><b>姑苏行记</b><p>为两个人做的苏州 48 小时</p></div></div>
+      <div class="footer-links">
+        <a href="#generator">重新生成</a><a href="#map-transit">地图</a><a href="#sources">出处</a>
+      </div>
+      <p class="footer-note">底图 © 高德地图 · 点位仅作行程示意<br>价格为 2026 年 10 月公开信息，出发前请复核</p>
+    </div>
+  </footer>
+    </div>
+  </div>
+
+  <div class="mobile-dock" aria-label="快捷操作">
+    <a href="#itinerary">看行程</a>
+    <button id="dockGenerate" type="button">一键生成</button>
+    <a href="#map-transit">地图</a>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <div class="modal" id="cardModal" hidden>
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="cardModalTitle">
+      <header class="modal-head">
+        <div><span class="transit-kicker">CUSTOM CARD</span><h2 id="cardModalTitle">手动加一站</h2></div>
+        <button type="button" class="modal-close" data-close-modal aria-label="关闭">×</button>
+      </header>
+      <form id="cardForm" class="card-form">
+        <input type="hidden" id="cardEditId">
+        <label class="form-wide">卡片标题<input id="cardTitle" required maxlength="40" placeholder="例如：给 TA 的生日晚餐"></label>
+        <div class="form-grid">
+          <label>哪一天<select id="cardDay"><option value="1">10.27 · Day 1</option><option value="2">10.28 · Day 2</option></select></label>
+          <label>开始时间<input id="cardStart" type="time" value="15:00" required></label>
+          <label>停留分钟<input id="cardDuration" type="number" min="15" step="15" value="60"></label>
+          <label>类型<select id="cardKind"><option value="spot">景点</option><option value="food">餐厅</option><option value="experience">体验</option><option value="rest">休息</option><option value="other">其他</option></select></label>
+          <label>人均花费<input id="cardPrice" type="number" min="0" step="10" placeholder="0"></label>
+          <label>关联已有地点（可选）<select id="cardPlace"><option value="">不关联地图</option></select></label>
+          <label>地址 / 位置<input id="cardAddress" maxlength="60" placeholder="可选"></label>
+        </div>
+        <label class="form-wide">备注<textarea id="cardNote" rows="3" maxlength="160" placeholder="想吃什么、订位电话、要带的东西……"></textarea></label>
+        <p class="tiny">手动卡片会加入对应日期的时间线，并计入“自定义”预算。关联已有地点后会进入地图与通勤计算；不关联则只进时间线和预算。住宿请在住宿区单独填写。</p>
+        <p class="form-warning" id="cardConflict" role="status" aria-live="polite" hidden></p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" data-close-modal>取消</button>
+          <button type="submit" class="btn btn-red">保存卡片</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <noscript><div class="noscript">本页面需要 JavaScript 来生成行程、预算与地图；请启用后刷新。</div></noscript>
+
+  <script src="assets/vendor/leaflet.js"></script>
+  <script src="assets/foods-extra.js"></script>
+  <script src="assets/data.js"></script>
+  <script src="assets/report-data.js"></script>
+  <script src="assets/planner.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>
