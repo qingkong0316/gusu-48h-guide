@@ -90,6 +90,10 @@
   ];
 
   const FOOD_PAGE_SIZE = 12;
+  // ≤1024px 走紧凑小卡 + 底部抽屉，一批 9 个正好 3×3；桌面沿用整块大卡排版。
+  const FOOD_PAGE_SIZE_COMPACT = 9;
+  const EXP_PAGE_SIZE = 12;
+  const EXP_PAGE_SIZE_COMPACT = 9;
 
   const XHS_POSTS = {
     zhuozhengyuan: [
@@ -238,7 +242,8 @@
     day: 1,
     mapFilter: "day1",
     foodFilter: "all",
-    foodLimit: FOOD_PAGE_SIZE,
+    foodShown: 0,
+    expShown: 0,
     priceMin: null,
     priceMax: null,
     priceFallback: false,
@@ -274,7 +279,19 @@
   let toastTimer = null;
   let sourceFoldWasOpen = false;
   let lastModalFocus = null;
+  let lastSheetFocus = null;
   let railTick = false;
+
+  // 1024px 是“紧凑小卡 + 底部抽屉”的断点；分页基数、按钮文案都跟着它走。
+  function isCompactLayout() {
+    return window.matchMedia("(max-width: 1024px)").matches;
+  }
+  function foodPageSize() {
+    return isCompactLayout() ? FOOD_PAGE_SIZE_COMPACT : FOOD_PAGE_SIZE;
+  }
+  function expPageSize() {
+    return isCompactLayout() ? EXP_PAGE_SIZE_COMPACT : EXP_PAGE_SIZE;
+  }
 
   // 尊重系统“减少动态效果”：JS 主动滚动时也不做平滑动画。
   function motionBehavior() {
@@ -1049,7 +1066,7 @@
     const [a, b] = normalizePriceRange(min, max);
     state.priceMin = a;
     state.priceMax = b;
-    state.foodLimit = FOOD_PAGE_SIZE;
+    state.foodShown = 0;
     renderPricePresets();
     syncPriceInputs();
     renderFoodFilters();
@@ -1081,10 +1098,35 @@
     }).join("");
   }
 
+  // 紧凑小卡：只留一眼能看懂的店名/价格/区域/口碑，点开进抽屉看完整大卡。
+  function miniFoodCard(f) {
+    const badge = f.ratingNote
+      ? `<span class="mini-card-badge">${esc(f.ratingNote)}</span>`
+      : "";
+    return `<button type="button" class="mini-card" data-mini-food="${f.id}" aria-label="查看 ${esc(f.name)} 的详情">
+      <span class="mini-card-name">${esc(f.name)}</span>
+      <span class="mini-card-price">${esc(f.priceLabel)}</span>
+      <span class="mini-card-meta">${esc(f.areaLabel)}</span>
+      ${badge}
+    </button>`;
+  }
+
+  function miniExpCard(e, i) {
+    return `<button type="button" class="mini-card" data-mini-exp="${e.id}" aria-label="查看 ${esc(e.name)} 的详情">
+      <span class="mini-card-index">${i + 1 < 10 ? `0${i + 1}` : i + 1}</span>
+      <span class="mini-card-name">${esc(e.name)}</span>
+      <span class="mini-card-meta">${esc(e.tags[0] || e.label)} · ${esc(e.areaLabel)}</span>
+      <span class="mini-card-price">${esc(e.priceLabel)} · ${e.durationMin} 分钟</span>
+    </button>`;
+  }
+
   function renderFoodGrid() {
     const list = filteredFoods();
-    const visible = list.slice(0, state.foodLimit);
-    $("#foodGrid").innerHTML = visible.map((f) => {
+    const pageSize = foodPageSize();
+    // foodShown 是「已显示多少家」，0 表示还没初始化，首批按当前断点的基数来。
+    if (!state.foodShown) state.foodShown = pageSize;
+    const visible = list.slice(0, state.foodShown);
+    const big = visible.map((f) => {
       const tags = [];
       if (f.ratingNote) tags.push(`<span class="tag tag--red">${esc(f.ratingNote)}</span>`);
       f.tags.slice(0, 2).forEach((t) => tags.push(`<span class="tag tag--ink">${esc(t)}</span>`));
@@ -1114,16 +1156,26 @@
           <button type="button" class="link-btn" data-add-food-card="${f.id}">＋ 加入行程</button>
         </div>
       </article>`;
-    }).join("") || '<p class="tiny food-empty">这个分类/价位暂时没有收录，换个价位试试。</p>';
+    }).join("");
+    // 大卡与小卡渲染自同一份数据；≤1024px 由 CSS 只显示小卡，桌面只显示大卡。
+    const mini = visible.map((f) => miniFoodCard(f)).join("");
+    $("#foodGrid").innerHTML = (big + mini) || '<p class="tiny food-empty">这个分类/价位暂时没有收录，换个价位试试。</p>';
     const more = Math.max(0, list.length - visible.length);
     $("#foodCount").textContent = `共 ${list.length} 家 · 已显示 ${visible.length} 家${state.priceMin != null || state.priceMax != null ? ` · 人均 ${priceRangeLabel()}` : ""}`;
     const load = $("#foodLoadMore");
     load.hidden = more <= 0;
-    load.textContent = more > 0 ? `再看 ${Math.min(FOOD_PAGE_SIZE, more)} 家` : "";
+    const next = Math.min(pageSize, more);
+    load.textContent = more > 0
+      ? (isCompactLayout() ? `刷新 · 再来 ${next} 家` : `再看 ${next} 家`)
+      : "";
   }
 
   function renderExperiences() {
-    $("#experienceGrid").innerHTML = DATA.experiences.map((e, i) => {
+    const list = DATA.experiences;
+    const pageSize = expPageSize();
+    if (!state.expShown) state.expShown = pageSize;
+    const visible = list.slice(0, state.expShown);
+    const big = visible.map((e, i) => {
       const key = EXP_TOGGLE[e.id];
       const active = key ? hasExp(key) : false;
       const infeasible = key === "sunset" && active && state.planMeta && state.planMeta.sunsetFits === false;
@@ -1150,6 +1202,18 @@
         </div>
       </article>`;
     }).join("");
+    const mini = visible.map((e, i) => miniExpCard(e, i)).join("");
+    $("#experienceGrid").innerHTML = big + mini;
+    const more = Math.max(0, list.length - visible.length);
+    const count = $("#expCount");
+    if (count) count.textContent = `共 ${list.length} 个 · 已显示 ${visible.length} 个`;
+    const load = $("#expLoadMore");
+    if (!load) return;
+    load.hidden = more <= 0;
+    const next = Math.min(pageSize, more);
+    load.textContent = more > 0
+      ? (isCompactLayout() ? `刷新 · 再来 ${next} 个` : `再看 ${next} 个`)
+      : "";
   }
 
   function renderSourceFilters() {
@@ -1508,6 +1572,122 @@
       target.focus();
     }
   }
+
+  /* =========================================================
+     详情抽屉（≤1024px 全屏底部浮层）
+     ========================================================= */
+  // 网格与抽屉共用同一套委托逻辑；抽屉不在网格里，所以两处都要绑。
+  function handleFoodCardAction(e) {
+    const mini = e.target.closest("[data-mini-food]");
+    if (mini) { openFoodSheet(mini.dataset.miniFood); return; }
+    const addBtn = e.target.closest("[data-add-food-card]");
+    if (addBtn) {
+      // 抽屉里再开 #cardModal 会叠成两层浮层，先把抽屉收掉。
+      if (isSheetOpen()) closeDetailSheet();
+      openFoodCard(addBtn.dataset.addFoodCard);
+      return;
+    }
+    const btn = e.target.closest(".food-card [data-map-place]");
+    if (btn) {
+      if (isSheetOpen()) closeDetailSheet();
+      showOnMap(btn.dataset.mapPlace);
+    }
+  }
+
+  function handleExperienceCardAction(e) {
+    const mini = e.target.closest("[data-mini-exp]");
+    if (mini) { openExpSheet(mini.dataset.miniExp); return; }
+    const mapBtn = e.target.closest(".exp-card [data-map-place]");
+    if (mapBtn) {
+      if (isSheetOpen()) closeDetailSheet();
+      showOnMap(mapBtn.dataset.mapPlace);
+      return;
+    }
+    const expBtn = e.target.closest("[data-exp-toggle]");
+    if (expBtn) {
+      toggleExperience(expBtn.dataset.expToggle);
+      refreshSheetCard();
+    }
+  }
+
+  function scrollMiniIntoView(selector, index) {
+    const el = $$(selector)[index];
+    if (el) el.scrollIntoView({ behavior: motionBehavior(), block: "center" });
+  }
+
+  function isSheetOpen() {
+    const sheet = $("#detailSheet");
+    return !!(sheet && !sheet.hidden);
+  }
+
+  function sheetFocusables() {
+    return $$("#detailSheet button, #detailSheet input, #detailSheet select, #detailSheet textarea, #detailSheet a[href], #detailSheet [tabindex]:not([tabindex='-1'])")
+      .filter((el) => !el.disabled && el.offsetParent !== null);
+  }
+
+  // 抽屉内容就是网格里那张完整大卡的克隆；去掉 id 避免与页面里的节点重名。
+  function openDetailSheet(sourceEl, title) {
+    const sheet = $("#detailSheet");
+    const body = $("#detailSheetBody");
+    if (!sheet || !body || !sourceEl) return;
+    lastSheetFocus = document.activeElement;
+    const clone = sourceEl.cloneNode(true);
+    clone.removeAttribute("id");
+    $$("[id]", clone).forEach((el) => el.removeAttribute("id"));
+    body.innerHTML = "";
+    body.appendChild(clone);
+    $("#detailSheetTitle").textContent = title;
+    sheet.hidden = false;
+    document.body.classList.add("modal-open");
+    setBackgroundInert(true);
+    setTimeout(() => {
+      if (sheet.hidden) return;
+      const close = $(".modal-close", sheet);
+      if (close) close.focus();
+    }, 60);
+  }
+
+  function closeDetailSheet(restoreFocus = true) {
+    const sheet = $("#detailSheet");
+    if (!sheet || sheet.hidden) return;
+    sheet.hidden = true;
+    document.body.classList.remove("modal-open");
+    setBackgroundInert(false);
+    const target = lastSheetFocus;
+    lastSheetFocus = null;
+    if (restoreFocus && target && target.isConnected && typeof target.focus === "function") {
+      target.focus();
+    }
+  }
+
+  function openFoodSheet(foodId) {
+    const card = $$("#foodGrid .food-card").find((el) => el.dataset.foodCard === foodId);
+    if (!card) return;
+    const food = placeById(foodId);
+    openDetailSheet(card, food ? food.name : "食单详情");
+  }
+
+  function openExpSheet(expId) {
+    const card = $$("#experienceGrid .exp-card").find((el) => el.dataset.expCard === expId);
+    if (!card) return;
+    const exp = DATA.experiences.find((e) => e.id === expId);
+    openDetailSheet(card, exp ? exp.name : "体验详情");
+  }
+
+  // 体验加入/移出会重排大卡，抽屉里的克隆要同步成最新状态。
+  function refreshSheetCard() {
+    if (!isSheetOpen()) return;
+    const body = $("#detailSheetBody");
+    const current = $(".exp-card", body);
+    if (!current || !current.dataset.expCard) return;
+    const fresh = $$("#experienceGrid .exp-card").find((el) => el.dataset.expCard === current.dataset.expCard);
+    if (!fresh) return;
+    const clone = fresh.cloneNode(true);
+    clone.removeAttribute("id");
+    $$("[id]", clone).forEach((el) => el.removeAttribute("id"));
+    body.replaceChild(clone, current);
+  }
+
   function openFoodCard(foodId) {
     const food = placeById(foodId);
     if (!food) return;
@@ -2253,10 +2433,10 @@
       const day = planDayOfPlace(place.id);
       if (day && state.day !== day) setDay(day);
       if (place.kind === "food") {
-        // 食单只渲染前 foodLimit 家；把目标抬进列表，后续筛选会自然复位。
+        // 食单分批渲染；把目标抬进已加载的批次里，后续筛选会自然复位。
         const index = DATA.foods.findIndex((f) => f.id === place.id);
         state.foodFilter = "all";
-        if (index >= 0) state.foodLimit = Math.max(state.foodLimit, index + 1);
+        if (index >= 0) state.foodShown = Math.max(state.foodShown || foodPageSize(), index + 1);
         renderFoodFilters();
         renderFoodGrid();
       }
@@ -2428,7 +2608,8 @@
       if (wasPriceFiltered) setPriceRange(null, null, false);
       const index = DATA.foods.findIndex((f) => f.id === id);
       state.foodFilter = "all";
-      state.foodLimit = Math.max(FOOD_PAGE_SIZE, index + 1);
+      // 分批渲染：把目标抬进已显示的范围内。
+      if (index >= 0) state.foodShown = Math.max(state.foodShown || foodPageSize(), index + 1);
       renderFoodFilters();
       renderFoodGrid();
       // 价位筛选会影响时间线/预算；清掉后重排一次，避免界面口径不一致。
@@ -2438,7 +2619,11 @@
     if (day && state.day !== day.day) {
       setDay(day.day);
     }
-    const el = document.getElementById(`tl-place-${id}`) || document.getElementById(`food-${id}`) || document.getElementById(`exp-${id}`);
+    const tlEl = document.getElementById(`tl-place-${id}`);
+    const bigEl = tlEl || document.getElementById(`food-${id}`) || document.getElementById(`exp-${id}`);
+    // ≤1024px 网格里的大卡是隐藏的，定位要落到那张小卡上，否则等于没跳。
+    const miniEl = $$(".mini-card").find((el) => el.dataset.miniFood === id || el.dataset.miniExp === id);
+    const el = (isCompactLayout() && !tlEl && miniEl) ? miniEl : bigEl;
     if (!el) {
       showToast("这个点位在当前方案之外，可以在食单或体验区查看。");
       return;
@@ -2812,14 +2997,23 @@
       const btn = e.target.closest("[data-food-filter]");
       if (!btn) return;
       state.foodFilter = btn.dataset.foodFilter;
-      state.foodLimit = FOOD_PAGE_SIZE;
+      state.foodShown = 0;
       renderFoodFilters();
       renderFoodGrid();
     });
 
     $("#foodLoadMore").addEventListener("click", () => {
-      state.foodLimit += FOOD_PAGE_SIZE;
+      const shown = state.foodShown;
+      state.foodShown += foodPageSize();
       renderFoodGrid();
+      if (isCompactLayout()) scrollMiniIntoView("#foodGrid .mini-card", shown);
+    });
+
+    $("#expLoadMore").addEventListener("click", () => {
+      const shown = state.expShown;
+      state.expShown += expPageSize();
+      renderExperiences();
+      if (isCompactLayout()) scrollMiniIntoView("#experienceGrid .mini-card", shown);
     });
 
     ["#pricePresets", "#foodPricePresets"].forEach((sel) => {
@@ -2848,19 +3042,12 @@
       if (el) el.addEventListener("click", () => setPriceRange(null, null, false));
     });
 
-    $("#foodGrid").addEventListener("click", (e) => {
-      const addBtn = e.target.closest("[data-add-food-card]");
-      if (addBtn) { openFoodCard(addBtn.dataset.addFoodCard); return; }
-      const btn = e.target.closest("[data-map-place]");
-      if (btn) showOnMap(btn.dataset.mapPlace);
-    });
-
-    $("#experienceGrid").addEventListener("click", (e) => {
-      const mapBtn = e.target.closest("[data-map-place]");
-      if (mapBtn) { showOnMap(mapBtn.dataset.mapPlace); return; }
-      const expBtn = e.target.closest("[data-exp-toggle]");
-      if (expBtn) toggleExperience(expBtn.dataset.expToggle);
-    });
+    // 网格与抽屉共用同一套委托：抽屉里的按钮同样能点。
+    $("#foodGrid").addEventListener("click", handleFoodCardAction);
+    $("#detailSheet").addEventListener("click", handleFoodCardAction);
+    $("#experienceGrid").addEventListener("click", handleExperienceCardAction);
+    $("#detailSheet").addEventListener("click", handleExperienceCardAction);
+    $$("[data-close-sheet]").forEach((el) => el.addEventListener("click", () => closeDetailSheet()));
 
     $("#mapFilters").addEventListener("click", (e) => {
       const btn = e.target.closest("[data-map-filter]");
@@ -2990,6 +3177,28 @@
     $("#cardForm").addEventListener("change", updateCardConflictPreview);
     $$("[data-close-modal]").forEach((el) => el.addEventListener("click", closeCardModal));
     document.addEventListener("keydown", (e) => {
+      const sheet = $("#detailSheet");
+      if (sheet && !sheet.hidden) {
+        if (e.key === "Escape") { closeDetailSheet(); return; }
+        if (e.key !== "Tab") return;
+        const sheetItems = sheetFocusables();
+        if (!sheetItems.length) return;
+        const first = sheetItems[0];
+        const last = sheetItems[sheetItems.length - 1];
+        if (!sheet.contains(document.activeElement)) {
+          e.preventDefault();
+          first.focus();
+          return;
+        }
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+        return;
+      }
       const modal = $("#cardModal");
       if (!modal || modal.hidden) return;
       if (e.key === "Escape") { closeCardModal(); return; }
@@ -3037,6 +3246,15 @@
       showToast(`准备打印 Day ${state.day}；两天都打印请先切换另一天。`);
       setTimeout(() => window.print(), 180);
     });
+
+    // 跨过 1024px 断点时，分页基数与小卡/大卡的排布都要重算。
+    const compactQuery = window.matchMedia("(max-width: 1024px)");
+    const onLayoutChange = () => {
+      renderFoodGrid();
+      renderExperiences();
+    };
+    if (typeof compactQuery.addEventListener === "function") compactQuery.addEventListener("change", onLayoutChange);
+    else if (typeof compactQuery.addListener === "function") compactQuery.addListener(onLayoutChange);
 
     const readDateBtn = $("#btnReadDate");
     if (readDateBtn) {

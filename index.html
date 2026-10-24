@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700;900&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="preload" as="image" href="assets/images/hero-canal.svg">
+  <link rel="preload" as="image" href="assets/images/hero-canal.jpg">
   <link rel="stylesheet" href="assets/vendor/leaflet.css">
   <link rel="stylesheet" href="assets/styles.css">
 </head>
@@ -94,7 +94,7 @@
 
   <main id="main">
     <section class="hero" id="top">
-      <div class="hero-media"><img src="assets/images/hero-canal.svg" alt="苏州平江路傍晚，情侣站在石桥上看摇橹船经过" fetchpriority="high"></div>
+      <div class="hero-media"><img src="assets/images/hero-canal.jpg" alt="苏州平江路傍晚，情侣站在石桥上看摇橹船经过" fetchpriority="high" width="1649" height="876"></div>
       <div class="hero-shade" aria-hidden="true"></div>
       <div class="hero-inner">
         <div class="hero-copy">
@@ -220,7 +220,7 @@
     </div>
 
     <section class="quote-band" aria-label="江南引语">
-      <img src="assets/images/garden-couple.svg" alt="苏州园林月洞门前的秋日情侣" loading="lazy">
+      <img src="assets/images/garden-couple.jpg" alt="苏州园林月洞门前的秋日情侣" loading="lazy" width="1413" height="876">
       <div class="quote-band-shade"></div>
       <div class="quote-band-inner">
         <p>“江南的浪漫，不在景点里，<br>在你们愿意为彼此慢下来的那一段路。”</p>
@@ -238,7 +238,7 @@
           <p class="section-desc">不是“必吃榜”复读机。每家都写了招牌、人均、口碑摘录，以及点评搜索 / 美团搜索入口。评分以平台实时为准。</p>
         </header>
         <div class="food-hero reveal">
-          <img src="assets/images/cuisine.svg" alt="松鼠鳜鱼、苏式面、生煎与海棠糕" loading="lazy">
+          <img src="assets/images/cuisine.jpg" alt="松鼠鳜鱼、苏式面、生煎与海棠糕" loading="lazy" width="1413" height="876">
           <div class="food-hero-copy">
             <span>苏帮菜 · 面点 · 小吃 · 湖边晚餐</span>
             <p>两个人点三菜，生煎先咬小口，面要趁热。苏州菜偏甜，落座时先说“少糖”，会舒服很多。</p>
@@ -259,7 +259,7 @@
         </div>
         <div class="food-count-row">
           <span id="foodCount">共 57 家</span>
-          <button type="button" class="text-btn" id="foodLoadMore">再看一些</button>
+          <button type="button" class="text-btn" id="foodLoadMore">刷新 · 再来 9 家</button>
         </div>
         <div class="food-grid" id="foodGrid"></div>
         <div class="food-note reveal">
@@ -277,6 +277,10 @@
           </div>
           <p class="section-desc">不赶场。选 2–3 个真正想一起做的，剩下的时间用来走路和发呆。</p>
         </header>
+        <div class="food-count-row">
+          <span id="expCount">共 8 个</span>
+          <button type="button" class="text-btn" id="expLoadMore" hidden>刷新 · 再来 9 个</button>
+        </div>
         <div class="experience-grid" id="experienceGrid"></div>
       </div>
     </section>
@@ -284,7 +288,7 @@
     <section class="stay-section section" id="stay">
       <div class="wrap stay-layout">
         <div class="stay-media reveal">
-          <img src="assets/images/garden-couple.svg" alt="秋日苏州园林里的情侣背影" loading="lazy">
+          <img src="assets/images/garden-couple.jpg" alt="秋日苏州园林里的情侣背影" loading="lazy" width="1413" height="876">
           <span class="stay-caption">把你们订好的住处，放在这里。</span>
         </div>
         <div class="stay-copy reveal">
@@ -597,6 +601,18 @@
           <button type="submit" class="btn btn-red">保存卡片</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- 小卡详情抽屉：≤1024px 从底部升起的全屏浮层，桌面退化为居中模态框 -->
+  <div class="detail-sheet" id="detailSheet" hidden>
+    <div class="modal-backdrop" data-close-sheet></div>
+    <div class="detail-panel" role="dialog" aria-modal="true" aria-labelledby="detailSheetTitle">
+      <header class="modal-head detail-head">
+        <div><span class="transit-kicker">DETAIL</span><h2 id="detailSheetTitle">详情</h2></div>
+        <button type="button" class="modal-close" data-close-sheet aria-label="关闭">×</button>
+      </header>
+      <div class="detail-body" id="detailSheetBody"></div>
     </div>
   </div>
   <noscript><div class="noscript">本页面需要 JavaScript 来生成行程、预算与地图；请启用后刷新。</div></noscript>
